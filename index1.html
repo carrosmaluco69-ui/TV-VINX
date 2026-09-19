@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080b11">
+<title>ViniTV • IPTV Player</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+:root{--bg:#080b11;--panel:#101620;--panel2:#151c28;--line:#263142;--txt:#f4f7fb;--muted:#94a0b3;--accent:#4f8cff;--danger:#ff5263}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Arial,system-ui,sans-serif}
+button,input{font:inherit}button{cursor:pointer;color:white}
+.top{height:64px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#0b1018;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{font-size:20px;font-weight:bold;white-space:nowrap}.brand b{color:var(--accent)}
+.search{flex:1;max-width:600px;margin:auto}.search input{width:100%;padding:11px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:white;outline:none}
+.primary,.secondary,.danger{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2)}.primary{background:var(--accent);border-color:var(--accent);font-weight:bold}
+.layout{display:grid;grid-template-columns:250px 1fr}.side{min-height:calc(100vh - 64px);border-right:1px solid var(--line);padding:15px}
+.side h3{color:var(--muted);font-size:12px;text-transform:uppercase;margin:20px 8px 8px}.nav{display:flex;width:100%;align-items:center;gap:8px;padding:11px;border:0;border-radius:10px;background:transparent;text-align:left}.nav:hover,.nav.active{background:var(--panel2)}.count{margin-left:auto;color:var(--muted)}
+.main{padding:18px}.playerWrap{background:#000;border:1px solid var(--line);border-radius:16px;overflow:hidden;position:relative}.video{width:100%;aspect-ratio:16/9;display:block;background:#000}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted)}.empty strong{display:block;color:white;font-size:22px;margin-bottom:6px}
+.now{display:flex;align-items:center;gap:12px;padding:13px 4px}.logo{width:45px;height:45px;border-radius:10px;object-fit:cover;background:#1b2330;border:1px solid var(--line)}.info{min-width:0}.name{font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cat{color:var(--muted);font-size:12px}.spacer{flex:1}.toolbar{display:flex;gap:8px}
+.sectionHead{display:flex;align-items:center;gap:10px;margin:20px 0 12px}.sectionHead h2{margin:0;font-size:18px}.sectionHead span{color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:11px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}.cardmain{padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer}.card .logo{width:48px;height:48px;flex-shrink:0}.ct{min-width:0}.ct strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ct small{color:var(--muted)}
+.fav{position:absolute;right:8px;top:8px;background:#0009;border:0;border-radius:8px;padding:5px 7px}.cardactions{display:flex;border-top:1px solid var(--line)}.cardactions button{flex:1;padding:9px;background:transparent;border:0;color:var(--muted);font-size:12px}.cardactions button:hover{background:var(--panel2);color:white}
+.overlay{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;padding:15px;z-index:50}.overlay.show{display:flex}
+.modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:#0d131c;border:1px solid var(--line);border-radius:18px;padding:20px}.modal h2{margin-top:0}.form{display:grid;gap:12px}.form label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.form input{width:100%;padding:12px;background:#080d14;border:1px solid var(--line);border-radius:10px;color:white;outline:none}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#161f2d;border:1px solid var(--line);padding:11px 15px;border-radius:10px;display:none;z-index:100}.toast.show{display:block}.hidden{display:none!important}
+.mobileNav{display:none}
+/* Tela cheia profissional */
+.video:fullscreen{width:100vw;height:100vh;aspect-ratio:auto;object-fit:contain;background:#000}
+.video:-webkit-full-screen{width:100vw;height:100vh;object-fit:contain;background:#000}
+.playerWrap:fullscreen{width:100vw;height:100vh;border:0;border-radius:0;background:#000}
+.playerWrap:fullscreen .video{width:100%;height:100%;aspect-ratio:auto;object-fit:contain}
+.fullscreenPlayerBtn{position:absolute;right:12px;bottom:12px;z-index:5;width:44px;height:44px;border:1px solid #ffffff33;border-radius:10px;background:#000b;color:white;font-size:20px;cursor:pointer;backdrop-filter:blur(6px)}
+.fullscreenPlayerBtn:hover{background:#151c28ee}
+
+@media(max-width:800px){.layout{display:block}.side{display:none}.mobileNav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#0b1018ee;border-top:1px solid var(--line);z-index:30;padding:7px}.mobileNav button{flex:1;background:transparent;border:0;color:var(--muted);padding:8px}.mobileNav button.active{background:var(--panel2);color:white}.main{padding:10px 10px 75px}.top{padding:0 10px}.brand{font-size:17px}.top .primary{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.row{grid-template-columns:1fr}.toolbar button{padding:9px}.search{min-width:0}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">Vini<b>TV</b> <span style="font-size:11px;color:#718096">• IPTV Player</span></div>
+  <div class="search"><input id="search" placeholder="Pesquisar canais..." autocomplete="off"></div>
+  <button class="primary" id="addTop">＋ Canal</button>
+</header>
+
+<div class="layout">
+<aside class="side">
+  <h3>Navegação</h3>
+  <button class="nav active" data-filter="all">🏠 Todos <span class="count" id="allCount">0</span></button>
+  <button class="nav" data-filter="fav">⭐ Favoritos <span class="count" id="favCount">0</span></button>
+  <button class="nav" data-filter="recent">🕘 Recentes</button>
+  <h3>Categorias</h3><div id="categories"></div>
+  <h3>Biblioteca</h3>
+  <button class="nav" id="addSide">➕ Adicionar canal</button>
+  <button class="nav" id="exportBtn">💾 Exportar lista</button>
+  <button class="nav" id="importBtn">📥 Importar lista</button>
+  <input id="importFile" type="file" accept=".json,.m3u,.m3u8" class="hidden">
+  <button class="nav" id="clearBtn">🗑️ Apagar canais</button>
+</aside>
+
+<main class="main">
+  <div class="playerWrap">
+    <video id="video" class="video" controls playsinline></video>
+    <div id="empty" class="empty"><div><strong>ViniTV</strong>Selecione um canal para começar.</div></div>
+    <button class="fullscreenPlayerBtn" id="playerFullBtn" title="Tela cheia" aria-label="Tela cheia">⛶</button>
+  </div>
+
+  <div class="now">
+    <img id="nowLogo" class="logo" alt="">
+    <div class="info"><div id="nowName" class="name">Nenhum canal selecionado</div><div id="nowCat" class="cat">—</div></div>
+    <div class="spacer"></div>
+    <div class="toolbar"><button class="secondary" id="fullBtn">⛶</button><button class="secondary" id="stopBtn">■ Parar</button></div>
+  </div>
+
+  <div class="sectionHead"><h2 id="sectionTitle">Todos os canais</h2><span id="resultCount"></span></div>
+  <div id="grid" class="grid"></div>
+  <div id="noResults" class="empty hidden" style="position:relative;min-height:180px">Nenhum canal encontrado.</div>
+</main>
+</div>
+
+<nav class="mobileNav">
+  <button class="active" data-filter="all">🏠<br>Todos</button>
+  <button data-filter="fav">⭐<br>Favoritos</button>
+  <button data-filter="recent">🕘<br>Recentes</button>
+  <button id="addMobile">＋<br>Canal</button>
+</nav>
+
+<div id="modalOverlay" class="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Adicionar canal</h2>
+    <div class="form">
+      <div><label>Nome do canal</label><input id="fName" placeholder="Ex.: Canal Esportes"></div>
+      <div class="row">
+        <div><label>Categoria</label><input id="fCategory" list="catList" placeholder="Ex.: Futebol"><datalist id="catList"></datalist></div>
+        <div><label>URL da logo</label><input id="fLogo" placeholder="https://.../logo.png"></div>
+      </div>
+      <div><label>URL M3U8</label><input id="fUrl" placeholder="https://servidor.com/canal.m3u8"></div>
+    </div>
+    <div class="modalActions">
+      <button class="secondary" id="cancelBtn">Cancelar</button>
+      <button class="primary" id="saveBtn">Salvar canal</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+const KEY="vinitv_channels_v2";
+const RECENT="vinitv_recent_v2";
+let channels=loadJSON(KEY,[]);
+let recent=loadJSON(RECENT,[]);
+let currentFilter="all";
+let editingId=null;
+let hls=null;
+
+function $(id){return document.getElementById(id)}
+
+function loadJSON(key,fallback){
+  try{const x=JSON.parse(localStorage.getItem(key));return x??fallback}
+  catch(e){return fallback}
+}
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+
+function esc(v=""){
+  return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+function placeholder(name){
+  return "data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" rx="16" fill="#1b2330"/><text x="50" y="57" text-anchor="middle" fill="#9aa7ba" font-size="28" font-family="Arial">${String(name||"TV").slice(0,2).toUpperCase()}</text></svg>`
+  );
+}
+
+function toast(msg){
+  $("toast").textContent=msg;
+  $("toast").classList.add("show");
+  clearTimeout(window.__toast);
+  window.__toast=setTimeout(()=>$("toast").classList.remove("show"),2500);
+}
+
+function persist(){
+  localStorage.setItem(KEY,JSON.stringify(channels));
+  localStorage.setItem(RECENT,JSON.stringify(recent));
+  render();
+}
+
+function categories(){
+  return [...new Set(channels.map(c=>c.category).filter(Boolean))].sort();
+}
+
+function renderCategories(){
+  $("categories").innerHTML=categories().map(c=>`
+    <button class="nav" data-filter="cat:${esc(c)}">📺 ${esc(c)}<span class="count">${channels.filter(x=>x.category===c).length}</span></button>
+  `).join("");
+  $("catList").innerHTML=categories().map(c=>`<option value="${esc(c)}">`).join("");
+}
+
+function filtered(){
+  let arr=[...channels];
+  if(currentFilter==="fav") arr=arr.filter(c=>c.favorite);
+  else if(currentFilter==="recent") arr=recent.map(id=>channels.find(c=>c.id===id)).filter(Boolean);
+  else if(currentFilter.startsWith("cat:")) arr=arr.filter(c=>c.category===currentFilter.slice(4));
+  const q=$("search").value.trim().toLowerCase();
+  if(q) arr=arr.filter(c=>(c.name+" "+c.category).toLowerCase().includes(q));
+  return arr;
+}
+
+function render(){
+  renderCategories();
+  $("allCount").textContent=channels.length;
+  $("favCount").textContent=channels.filter(c=>c.favorite).length;
+  const arr=filtered();
+  $("resultCount").textContent=`${arr.length} canal${arr.length===1?"":"is"}`;
+  $("grid").innerHTML=arr.map(c=>`
+    <article class="card">
+      <button class="fav" data-action="fav" data-id="${esc(c.id)}">${c.favorite?"★":"☆"}</button>
+      <div class="cardmain" data-action="play" data-id="${esc(c.id)}">
+        <img class="logo" src="${esc(c.logo||placeholder(c.name))}" onerror="this.src='${placeholder(c.name)}'" alt="">
+        <div class="ct"><strong>${esc(c.name)}</strong><small>${esc(c.category||"Sem categoria")}</small></div>
+      </div>
+      <div class="cardactions">
+        <button data-action="play" data-id="${esc(c.id)}">▶ Assistir</button>
+        <button data-action="edit" data-id="${esc(c.id)}">✏ Editar</button>
+        <button data-action="delete" data-id="${esc(c.id)}">🗑</button>
+      </div>
+    </article>
+  `).join("");
+  $("noResults").classList.toggle("hidden",arr.length!==0);
+  let title="Todos os canais";
+  if(currentFilter==="fav") title="Favoritos";
+  else if(currentFilter==="recent") title="Canais recentes";
+  else if(currentFilter.startsWith("cat:")) title=currentFilter.slice(4);
+  $("sectionTitle").textContent=title;
+  document.querySelectorAll("[data-filter]").forEach(b=>b.classList.toggle("active",b.dataset.filter===currentFilter));
+}
+
+function openModal(id=null){
+  editingId=id;
+  $("modalTitle").textContent=id?"Editar canal":"Adicionar canal";
+  const c=id?channels.find(x=>x.id===id):null;
+  $("fName").value=c?.name||"";
+  $("fCategory").value=c?.category||"";
+  $("fLogo").value=c?.logo||"";
+  $("fUrl").value=c?.url||"";
+  $("modalOverlay").classList.add("show");
+  setTimeout(()=>$("fName").focus(),100);
+}
+
+function closeModal(){
+  $("modalOverlay").classList.remove("show");
+  editingId=null;
+}
+
+function saveChannel(){
+  const name=$("fName").value.trim();
+  const category=$("fCategory").value.trim()||"Outros";
+  const logo=$("fLogo").value.trim();
+  const url=$("fUrl").value.trim();
+
+  if(!name){toast("Digite o nome do canal.");$("fName").focus();return}
+  if(!url){toast("Digite a URL M3U8.");$("fUrl").focus();return}
+  if(!/^https?:\/\//i.test(url)){toast("A URL deve começar com http:// ou https://");return}
+
+  if(editingId){
+    const c=channels.find(x=>x.id===editingId);
+    if(c) Object.assign(c,{name,category,logo,url});
+  }else{
+    channels.push({id:uid(),name,category,logo,url,favorite:false,createdAt:Date.now()});
+  }
+
+  closeModal();
+  persist();
+  toast("Canal salvo com sucesso!");
+}
+
+function toggleFav(id){
+  const c=channels.find(x=>x.id===id);
+  if(!c)return;
+  c.favorite=!c.favorite;
+  persist();
+  toast(c.favorite?"Adicionado aos favoritos":"Removido dos favoritos");
+}
+
+function play(id){
+  const c=channels.find(x=>x.id===id);
+  if(!c)return;
+  $("empty").classList.add("hidden");
+  $("nowName").textContent=c.name;
+  $("nowCat").textContent=c.category||"Sem categoria";
+  $("nowLogo").src=c.logo||placeholder(c.name);
+
+  if(hls){hls.destroy();hls=null}
+  const video=$("video");
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+
+  if(window.Hls && Hls.isSupported()){
+    hls=new Hls({enableWorker:true,maxBufferLength:30});
+    hls.loadSource(c.url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
+    hls.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal)toast("Não foi possível reproduzir esse M3U8.");});
+  }else if(video.canPlayType("application/vnd.apple.mpegurl")){
+    video.src=c.url;
+    video.play().catch(()=>{});
+  }else{
+    toast("Seu navegador não suporta HLS.");
+    return;
+  }
+
+  recent=[id,...recent.filter(x=>x!==id)].slice(0,20);
+  localStorage.setItem(RECENT,JSON.stringify(recent));
+}
+
+function stopVideo(){
+  if(hls){hls.destroy();hls=null}
+  const v=$("video");v.pause();v.removeAttribute("src");v.load();
+  $("empty").classList.remove("hidden");
+  $("nowName").textContent="Nenhum canal selecionado";
+  $("nowCat").textContent="—";
+}
+
+function fullscreen(){
+  const video=$("video");
+  if(document.fullscreenElement){
+    if(document.exitFullscreen) document.exitFullscreen();
+    return;
+  }
+  if(video.requestFullscreen){
+    video.requestFullscreen();
+  }else if(video.webkitRequestFullscreen){
+    video.webkitRequestFullscreen();
+  }else if(video.webkitEnterFullscreen){
+    video.webkitEnterFullscreen();
+  }else{
+    toast("Tela cheia não é suportada neste navegador.");
+  }
+}
+
+function deleteChannel(id){
+  const c=channels.find(x=>x.id===id);
+  if(!c)return;
+  if(confirm(`Excluir "${c.name}"?`)){
+    channels=channels.filter(x=>x.id!==id);
+    recent=recent.filter(x=>x!==id);
+    persist();toast("Canal excluído.");
+  }
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify({app:"ViniTV",version:2,channels},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="vinitv-canais.json";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function importFile(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const text=reader.result;
+      if(/^\s*#EXTM3U/i.test(text)||/\.(m3u8?|m3u)$/i.test(file.name)) importM3U(text);
+      else{
+        const data=JSON.parse(text);
+        const incoming=Array.isArray(data)?data:data.channels;
+        if(!Array.isArray(incoming))throw Error();
+        channels.push(...incoming.filter(x=>x&&x.name&&x.url).map(x=>({...x,id:x.id||uid(),category:x.category||"Outros",favorite:!!x.favorite})));
+        persist();toast("Lista importada.");
+      }
+    }catch(e){toast("Arquivo inválido.");}
+  };
+  reader.readAsText(file);
+}
+
+function importM3U(text){
+  const lines=text.split(/\r?\n/);const imported=[];let meta=null;
+  for(const raw of lines){
+    const line=raw.trim();if(!line)continue;
+    if(line.toUpperCase().startsWith("#EXTINF")){meta=line;continue}
+    if(!line.startsWith("#")&&/^https?:\/\//i.test(line)){
+      const name=(meta?.split(",").slice(1).join(",")||"Canal").trim();
+      const category=(meta?.match(/group-title="([^"]*)"/i)||[])[1]||"Outros";
+      const logo=(meta?.match(/tvg-logo="([^"]*)"/i)||[])[1]||"";
+      imported.push({id:uid(),name,category,logo,url:line,favorite:false,createdAt:Date.now()});
+      meta=null;
+    }
+  }
+  if(!imported.length){toast("Nenhum canal M3U encontrado.");return}
+  channels.push(...imported);persist();toast(`${imported.length} canais importados.`);
+}
+
+function clearAll(){
+  if(channels.length&&confirm("Apagar todos os canais salvos?")){
+    channels=[];recent=[];localStorage.removeItem(KEY);localStorage.removeItem(RECENT);stopVideo();render();toast("Biblioteca limpa.");
+  }
+}
+
+/* Eventos — sem onclick inline, para funcionar melhor em celular */
+$("addTop").addEventListener("click",()=>openModal());
+$("addSide").addEventListener("click",()=>openModal());
+$("addMobile").addEventListener("click",()=>openModal());
+$("cancelBtn").addEventListener("click",closeModal);
+$("saveBtn").addEventListener("click",saveChannel);
+$("stopBtn").addEventListener("click",stopVideo);
+$("fullBtn").addEventListener("click",fullscreen);
+$("playerFullBtn").addEventListener("click",fullscreen);
+$("exportBtn").addEventListener("click",exportData);
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("clearBtn").addEventListener("click",clearAll);
+$("search").addEventListener("input",render);
+$("importFile").addEventListener("change",e=>importFile(e.target.files[0]));
+
+$("modalOverlay").addEventListener("click",e=>{if(e.target===$("modalOverlay"))closeModal()});
+
+document.addEventListener("click",e=>{
+  const filter=e.target.closest("[data-filter]");
+  if(filter){currentFilter=filter.dataset.filter;render();return}
+  const action=e.target.closest("[data-action]");
+  if(!action)return;
+  const id=action.dataset.id;
+  if(action.dataset.action==="play")play(id);
+  if(action.dataset.action==="fav")toggleFav(id);
+  if(action.dataset.action==="edit")openModal(id);
+  if(action.dataset.action==="delete")deleteChannel(id);
+});
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")closeModal();
+});
+
+render();
+</script>
+</body>
+</html>
